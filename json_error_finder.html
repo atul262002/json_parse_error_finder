@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Error Finder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        textarea {
+            width: 98%;
+            height: 200px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .error-info {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success-info {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .context {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .char-highlight {
+            background: #ff6b6b;
+            color: white;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JSON Error Finder</h1>
+        <p>Paste your JSON below to find the exact location of parsing errors:</p>
+        
+        <textarea id="jsonInput" placeholder="Paste your JSON here..."></textarea>
+        
+        <button onclick="analyzeJSON()">Find Error</button>
+        <!-- <button onclick="loadSampleJSON()">Load Your Sample JSON</button> -->
+        <button onclick="clearInput()">Clear</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const sampleJSON = ``;
+
+        // function loadSampleJSON() {
+            // document.getElementById('jsonInput').value = sampleJSON;
+        // }
+
+        function clearInput() {
+            document.getElementById('jsonInput').value = '';
+            document.getElementById('result').innerHTML = '';
+        }
+
+        function analyzeJSON() {
+            const jsonString = document.getElementById('jsonInput').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!jsonString.trim()) {
+                resultDiv.innerHTML = '<div class="error-info">Please paste some JSON to analyze.</div>';
+                return;
+            }
+            
+            try {
+                JSON.parse(jsonString);
+                resultDiv.innerHTML = '<div class="success-info">✅ JSON is valid!</div>';
+            } catch (error) {
+                // Extract column number from error message
+                const columnMatch = error.message.match(/column (\d+)/);
+                const lineMatch = error.message.match(/line (\d+)/);
+                
+                if (columnMatch) {
+                    const errorColumn = parseInt(columnMatch[1]) - 1; // Convert to 0-based index
+                    const errorLine = lineMatch ? parseInt(lineMatch[1]) - 1 : 0;
+                    
+                    // Get context around the error
+                    const lines = jsonString.split('\\n');
+                    const currentLine = lines[errorLine] || jsonString;
+                    
+                    const start = Math.max(0, errorColumn - 30);
+                    const end = Math.min(currentLine.length, errorColumn + 30);
+                    const context = currentLine.substring(start, end);
+                    
+                    const problemChar = currentLine[errorColumn];
+                    const problemCharCode = problemChar ? problemChar.charCodeAt(0) : 'undefined';
+                    
+                    // Highlight the problem character
+                    const beforeChar = context.substring(0, errorColumn - start);
+                    const afterChar = context.substring(errorColumn - start + 1);
+                    const highlightedContext = beforeChar + 
+                        '<span class="char-highlight">' + (problemChar || '?') + '</span>' + 
+                        afterChar;
+                    
+                    resultDiv.innerHTML = `
+                        <div class="error-info">
+                            <strong>❌ JSON Parse Error:</strong><br>
+                            ${error.message}
+                        </div>
+                        <div class="context">
+                            <strong>Context around error (position ${errorColumn + 1}):</strong><br>
+                            ${highlightedContext}
+                        </div>
+                        <div class="error-info">
+                            <strong>Problem Character:</strong> '${problemChar || 'undefined'}' (char code: ${problemCharCode})<br>
+                            <strong>Position:</strong> Line ${errorLine + 1}, Column ${errorColumn + 1}
+                        </div>
+                    `;
+                    
+                    // Additional analysis for common escape character issues
+                    if (problemChar === '\\\\') {
+                        resultDiv.innerHTML += `
+                            <div class="error-info">
+                                <strong>💡 Tip:</strong> This looks like an escape character issue. 
+                                Check if there's an invalid escape sequence like \\a, \\b, \\c, etc. 
+                                Valid JSON escape sequences are: \\", \\\\, \\/, \\b, \\f, \\n, \\r, \\t, \\uXXXX
+                            </div>
+                        `;
+                    }
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error-info">
+                            <strong>❌ JSON Parse Error:</strong><br>
+                            ${error.message}
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        // Load sample JSON on page load
+        // window.onload = function() {
+        //     loadSampleJSON();
+        // };
+    </script>
+</body>
+</html>
